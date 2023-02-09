@@ -80,7 +80,7 @@
 $ docker-compose run app python manage.py createsuperuser
 ```
 
-<p>>It will ask User, email and password. After entering all the details, hit the below url in any browser</p>
+<p>It will ask User, email and password. After entering all the details, hit the below url in any browser</p>
 
 ```
 127.0.0.1:8000/admin/
