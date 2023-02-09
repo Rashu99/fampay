@@ -1,8 +1,10 @@
 from django.contrib.postgres.search import SearchVector, SearchQuery
-from rest_framework import generics
+from rest_framework import generics, status
 from .serializers import VideoSerializer, APIAuthKeySerializer
 from rest_framework.pagination import PageNumberPagination
 from .models import Video, APIAuthKey
+from rest_framework.response import Response
+from rest_framework import exceptions
 
 
 class VideoPagination(PageNumberPagination):
@@ -35,6 +37,12 @@ class ListVideos(generics.ListAPIView):
     serializer_class = VideoSerializer
     pagination_class = VideoPagination
 
+    def list(self, request, *args, **kwargs):
+        try:
+            return super().list(request, *args, **kwargs)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class ListVideoSearch(generics.ListAPIView):
     """
@@ -47,6 +55,8 @@ class ListVideoSearch(generics.ListAPIView):
 
     def get_queryset(self):
         search_text = self.request.query_params.get('query', None)
+        if not search_text:
+            raise exceptions.ValidationError({'error': 'Query parameter is missing'})
         vector = SearchVector('title', 'description', config='english')
         query = SearchQuery(search_text)
 
@@ -56,6 +66,14 @@ class ListVideoSearch(generics.ListAPIView):
                                                                                       'channel_id')
         return query_set
 
+    def list(self, request, *args, **kwargs):
+        try:
+            return super().list(request, *args, **kwargs)
+        except exceptions.ValidationError as e:
+            return Response(e.detail, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class AddAuthKey(generics.CreateAPIView):
     """
@@ -63,3 +81,15 @@ class AddAuthKey(generics.CreateAPIView):
     """
     serializer_class = APIAuthKeySerializer
     queryset = APIAuthKey.objects.all()
+
+    def create(self, request, *args, **kwargs):
+        auth_key = request.data.get('auth_key', None)
+        if not auth_key:
+            return Response({'error': 'Auth key is missing. Please provide auth_key in header'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        try:
+            return super().create(request, *args, **kwargs)
+        except exceptions.ValidationError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
