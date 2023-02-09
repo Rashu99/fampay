@@ -3,38 +3,46 @@ import datetime
 import requests
 import json
 
-from .constants import YOUTUBE_API_URL
-from .models import Video
+from .constants import YOUTUBE_API_URL, SEARCH_STRING_FOR_VIDEO, MAX_RESULTS_PER_API_CALL
+from .models import APIAuthKey
+from .service import YoutubeService
 from .utils import get_date_time_n_secs_ago
 from fampay import celery_app
 
 
 @celery_app.task
 def fetch_videos():
+    """
+        This function fetch the videos from Youtube through search api v3
+    """
     print("Running fetch video task ", datetime.datetime.now())
 
-    # make API call to retrieve the latest videos
-    published_after = get_date_time_n_secs_ago(1800)
+    # Setting published_after to 1 hour ago time from current time
+    published_after = get_date_time_n_secs_ago(3600)
     print("publishAfterTime", published_after)
-    response = requests.get(YOUTUBE_API_URL, params={
-        'part': 'snippet',
-        'maxResults': 25,
-        'q': 'music',
-        'key': 'AIzaSyBodjcjdKbrqa2h4_lLe3F956n4BT9QmE4',
-        'publishedAfter': published_after
-    })
-    data = json.loads(response.text)
-    print("After Hitting Api Data is ")
-    print(data)
-    videos = data.get('items', [])
+
+    # Getting valid Auth key from DB
+    auth_key = APIAuthKey.get_auth_key()
+    if not auth_key:
+        print("Please add API Auth Key. No auth key available")
+        return
+    videos = []
+    try:
+        # Calling Youtube search api to get the videos
+        response = requests.get(YOUTUBE_API_URL, params={
+            'part': 'snippet',
+            'maxResults': MAX_RESULTS_PER_API_CALL,
+            'q': SEARCH_STRING_FOR_VIDEO,
+            'key': auth_key,
+            'publishedAfter': published_after
+        })
+        data = json.loads(response.text)
+        videos = data.get('items', [])
+    except Exception as e:
+        # Considering this exception because api key may got exhausted,
+        # marking auth key as exhausted
+        APIAuthKey.mark_auth_key_exhausted(auth_key)
+        print("There is error while making request to youtube. May be authKey get exhausted. Error: ", e)
 
     # save videos in the database
-    for video in videos:
-        Video.objects.create(
-            title=video['snippet']['title'],
-            description=video['snippet']['description'],
-            publish_datetime=video['snippet']['publishedAt'],
-            video_id=video['id']['videoId'],
-            channel_id=video['snippet']['channelId'],
-            thumbnail_url=video['snippet']['thumbnails']['default']['url']
-        )
+    YoutubeService.process_videos(videos)
