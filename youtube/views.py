@@ -1,8 +1,7 @@
 from rest_framework import generics
-from .serializers import VideoSerializer
+from .serializers import VideoSerializer, APIAuthKeySerializer
 from rest_framework.pagination import PageNumberPagination
-from django.contrib.postgres.search import SearchVector, SearchQuery
-from .models import Video
+from .models import Video, APIAuthKey
 
 
 class VideoPagination(PageNumberPagination):
@@ -22,6 +21,14 @@ class VideoPagination(PageNumberPagination):
 
 
 class ListVideos(generics.ListAPIView):
+    """
+        This view is for getting all the videos with pagination
+        We can pass the query param 'page_limit' to give page size
+        otherwise
+            It will take default page size as 10
+
+        Refer VideoPagination class for pagination
+    """
     queryset = Video.objects.order_by('-publish_datetime').values('id', 'title', 'description', 'publish_datetime',
                                                                   'thumbnail_url', 'video_id', 'channel_id')
     serializer_class = VideoSerializer
@@ -29,14 +36,25 @@ class ListVideos(generics.ListAPIView):
 
 
 class ListVideoSearch(generics.ListAPIView):
+    """
+        This view is for getting the videos by search keyword.
+        We can pass query param 'query' to search video. It will search in title and description of video
+
+        Used search vector field to optimise the search
+    """
     serializer_class = VideoSerializer
 
     def get_queryset(self):
         search_text = self.request.query_params.get('query', None)
-        vector = SearchVector('title', 'description', config='english')
-        query = SearchQuery(search_text)
-        query_set = Video.objects.annotate(search=vector).filter(search=query).values('id', 'title', 'description',
-                                                                                      'publish_datetime',
-                                                                                      'thumbnail_url', 'video_id',
-                                                                                      'channel_id')
+        query_set = Video.objects.filter(search_vector=search_text).values('id', 'title', 'description',
+                                                                           'publish_datetime',
+                                                                           'thumbnail_url', 'video_id', 'channel_id')
         return query_set
+
+
+class AddAuthKey(generics.CreateAPIView):
+    """
+        This view is responsible for adding auth keys
+    """
+    serializer_class = APIAuthKeySerializer
+    queryset = APIAuthKey.objects.all()
