@@ -1,0 +1,50 @@
+version: '3'
+
+services:
+  db:
+    image: postgres
+    environment:
+      POSTGRES_USER: fampay
+      POSTGRES_DB: fampay
+      POSTGRES_PASSWORD: fampay@123
+    volumes:
+      - pgdata:/var/lib/posgresql/data
+
+  redis:
+    image: "redis:alpine"
+
+  app:
+    build:
+      context: .
+    command: bash -c "python manage.py makemigrations && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    container_name: youtube_service
+    volumes:
+      - .:/youtube
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+
+  celery:
+    build:
+      context: .
+    command: celery -A fampay worker --loglevel=info
+    volumes:
+      - .:/youtube
+    depends_on:
+      - db
+      - redis
+
+  celery-beat:
+    build:
+      context: .
+    command: celery -A fampay beat --loglevel=info
+    volumes:
+      - .:/youtube
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  pgdata:

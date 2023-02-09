@@ -16,3 +16,6 @@ db.sqlite3
 celerybeat-schedule.db
 
 .idea
+
+#migration files
+migrations/

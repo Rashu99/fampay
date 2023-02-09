@@ -1,3 +1,4 @@
+from django.contrib.postgres.search import SearchVector, SearchQuery
 from rest_framework import generics
 from .serializers import VideoSerializer, APIAuthKeySerializer
 from rest_framework.pagination import PageNumberPagination
@@ -40,15 +41,19 @@ class ListVideoSearch(generics.ListAPIView):
         This view is for getting the videos by search keyword.
         We can pass query param 'query' to search video. It will search in title and description of video
 
-        Used search vector field to optimise the search
+        Used search vector to optimise the search
     """
     serializer_class = VideoSerializer
 
     def get_queryset(self):
         search_text = self.request.query_params.get('query', None)
-        query_set = Video.objects.filter(search_vector=search_text).values('id', 'title', 'description',
-                                                                           'publish_datetime',
-                                                                           'thumbnail_url', 'video_id', 'channel_id')
+        vector = SearchVector('title', 'description', config='english')
+        query = SearchQuery(search_text)
+
+        query_set = Video.objects.annotate(search=vector).filter(search=query).values('id', 'title', 'description',
+                                                                                      'publish_datetime',
+                                                                                      'thumbnail_url', 'video_id',
+                                                                                      'channel_id')
         return query_set
 
 

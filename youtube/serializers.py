@@ -8,7 +8,7 @@ class VideoSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = Video
-        exclude = ['search_vector']
+        fields = '__all__'
 
 
 class APIAuthKeySerializer(serializers.ModelSerializer):
